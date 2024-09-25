@@ -8,7 +8,6 @@ from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Set random seed for reproducibility
 seed = 57
 random.seed(seed)
 np.random.seed(seed)
@@ -20,24 +19,21 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 def preprocess(df):
-    # Handle missing values (assuming 0 values in certain columns are actually missing)
+
     zero_columns = ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI']
     for column in zero_columns:
         df[column] = df[column].replace(0, np.nan)
     df = df.fillna(df.mean())
-    
-    # Feature engineering
-    df['Glucose_to_Insulin_Ratio'] = df['Glucose'] / (df['Insulin'] + 1)  # Adding 1 to avoid division by zero
+
+    df['Glucose_to_Insulin_Ratio'] = df['Glucose'] / (df['Insulin'] + 1)  
     df['BMI_Category'] = pd.cut(df['BMI'], bins=[0, 18.5, 25, 30, 100], labels=[0, 1, 2, 3])
-    
-    # One-hot encoding for categorical variables
+
     df = pd.get_dummies(df, columns=['BMI_Category'])
-    
-    # Normalize numerical features
+
     scaler = StandardScaler()
     numerical_features = ['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age', 'Glucose_to_Insulin_Ratio']
     df[numerical_features] = scaler.fit_transform(df[numerical_features])
-    
+
     return df
 
 class DiabetesModel(torch.nn.Module):
@@ -46,7 +42,7 @@ class DiabetesModel(torch.nn.Module):
         self.layer1 = torch.nn.Linear(num_features, 72)
         self.layer2 = torch.nn.Linear(72, 64)
         self.layer3 = torch.nn.Linear(64, 1)
-    
+
     def forward(self, x):
         x = torch.relu(self.layer1(x))
         x = torch.relu(self.layer2(x))
@@ -55,23 +51,21 @@ class DiabetesModel(torch.nn.Module):
 def train(model, X, y, learning_rate=0.001, epochs=200):
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.BCELoss()
-    
-    losses = []  # To store the loss values
+
+    losses = []  
     for _ in range(epochs):
         optimizer.zero_grad()
         output = model(X)
         loss = criterion(output, y)
         loss.backward()
         optimizer.step()
-        losses.append(loss.item())  # Store the loss value
-    
-    return losses  # Return the list of losses
+        losses.append(loss.item())  
 
-# Load and preprocess data
+    return losses  
+
 df = pd.read_csv('diabetes.csv')
 df = preprocess(df)
 
-# Split features and target
 X = df.drop('Outcome', axis=1)
 y = df['Outcome']
 
@@ -92,12 +86,12 @@ model = DiabetesModel(num_features=num_features)
 
 losses = train(model, X_train, y_train, learning_rate=0.001, epochs=40)
 
-# Plot loss curve
 plt.figure(figsize=(10, 6))
 plt.plot(losses)
 plt.title('Training Loss Curve')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
+plt.savefig('loss_curve.png')
 plt.show()
 
 with torch.no_grad():
@@ -106,28 +100,24 @@ with torch.no_grad():
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Accuracy: {accuracy * 100:.2f}%")
 
-# Compute confusion matrix
 cm = confusion_matrix(y_test, y_pred)
 
-# Plot confusion matrix
 plt.figure(figsize=(8, 6))
 sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
 plt.title('Confusion Matrix')
 plt.ylabel('True Label')
 plt.xlabel('Predicted Label')
+plt.savefig('confusion_matrix.png')
 plt.show()
 
-# Print classification report
 from sklearn.metrics import classification_report
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 
-# Compute ROC curve and AUC
 y_pred_proba = model(X_test).detach().numpy()
 fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
 roc_auc = auc(fpr, tpr)
 
-# Plot ROC curve
 plt.figure(figsize=(8, 6))
 plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
 plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
@@ -137,4 +127,5 @@ plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('Receiver Operating Characteristic (ROC) Curve')
 plt.legend(loc="lower right")
+plt.savefig('roc_curve.png')
 plt.show()
